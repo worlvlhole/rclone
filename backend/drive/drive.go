@@ -468,7 +468,7 @@ func (f *Fs) list(dirIDs []string, title string, directoriesOnly bool, filesOnly
 		_ = parentsQuery.WriteByte(')')
 		query = append(query, parentsQuery.String())
 	}
-	stem := ""
+	var stems []string
 	if title != "" {
 		// Escaping the backslash isn't documented but seems to work
 		searchTitle := strings.Replace(title, `\`, `\\`, -1)
@@ -476,16 +476,21 @@ func (f *Fs) list(dirIDs []string, title string, directoriesOnly bool, filesOnly
 		// Convert ／ to / for search
 		searchTitle = strings.Replace(searchTitle, "／", "/", -1)
 
-		handleGdocs := !directoriesOnly && !f.opt.SkipGdocs
-		// if the search title contains an extension and the extension is in the export extensions add a search
-		// for the filename without the extension.
-		// assume that export extensions don't contain escape sequences and only have one part (not .tar.gz)
-		if ext := path.Ext(searchTitle); handleGdocs && len(ext) > 0 && containsString(f.exportExtensions, ext) {
-			stem = title[:len(title)-len(ext)]
-			query = append(query, fmt.Sprintf("(name='%s' or name='%s')", searchTitle, searchTitle[:len(title)-len(ext)]))
-		} else {
-			query = append(query, fmt.Sprintf("name='%s'", searchTitle))
+		var titleQuery bytes.Buffer
+		_, _ = fmt.Fprintf(&titleQuery, "(name='%s'", searchTitle)
+		if !directoriesOnly && !f.opt.SkipGdocs {
+			// If the search title has an extension that is in the export extensions add a search
+			// for the filename without the extension.
+			// Assume that export extensions don't contain escape sequences.
+			for _, ext := range f.exportExtensions {
+				if strings.HasSuffix(searchTitle, ext) {
+					stems = append(stems, title[:len(title)-len(ext)])
+					_, _ = fmt.Fprintf(&titleQuery, " or name='%s'", searchTitle[:len(title)-len(ext)])
+				}
+			}
 		}
+		_ = titleQuery.WriteByte(')')
+		query = append(query, titleQuery.String())
 	}
 	if directoriesOnly {
 		query = append(query, fmt.Sprintf("mimeType='%s'", driveFolderType))
@@ -537,7 +542,14 @@ OUTER:
 			// the `=` operator is case insensitive.
 
 			if title != "" && title != item.Name {
-				if stem == "" || stem != item.Name {
+				found := false
+				for _, stem := range stems {
+					if stem == item.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
 					continue
 				}
 				_, exportName, _, _ := f.findExportFormat(item)
