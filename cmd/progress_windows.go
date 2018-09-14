@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"sync"
 
@@ -23,6 +22,7 @@ func writeToTerminal(b []byte) {
 	})
 	_, err := ansiParser.Parse(b)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\n*** Error from ANSI parser: %v\n", err)
+		// Ignore errors - can't log them and printing them spams the user
+		// _, _ = fmt.Fprintf(os.Stderr, "\n*** Error from ANSI parser: %v\n", err)
 	}
 }
