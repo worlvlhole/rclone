@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -51,7 +52,7 @@ func init() {
 		NewFs:       NewFs,
 		Options: append([]fs.Option{{
 			Name:    "env_auth",
-			Help:    "Get swift credentials from environment variables in standard OpenStack form.",
+			Help:    "Get swift credentials from environment variables in standard OpenStack form. (SWIFT_ENV_AUTH)",
 			Default: false,
 			Examples: []fs.OptionExample{
 				{
@@ -361,7 +362,7 @@ func NewFsWithConnection(opt *Options, name, root string, c *swift.Connection, n
 	return f, nil
 }
 
-// NewFs contstructs an Fs from the path, container:path
+// NewFs constructs an Fs from the path, container:path
 func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
 	// Parse config into Options struct
 	opt := new(Options)
@@ -372,6 +373,16 @@ func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
 	err = checkUploadChunkSize(opt.ChunkSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "swift: chunk size")
+	}
+
+	//Check if set - ENV takes precedence
+	val, ok := os.LookupEnv("SWIFT_ENV_AUTH")
+	if ok {
+		envAuth, err := strconv.ParseBool(val)
+		if err != nil {
+			return nil, err
+		}
+		opt.EnvAuth = envAuth
 	}
 
 	c, err := swiftConnection(opt, name)
