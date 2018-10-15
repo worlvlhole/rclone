@@ -380,7 +380,7 @@ func NewFs(name, root string, m configmap.Mapper) (fs.Fs, error) {
 	if ok {
 		envAuth, err := strconv.ParseBool(val)
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("SWIFT_ENV_AUTH: %s", err.Error())
 		}
 		opt.EnvAuth = envAuth
 	}
